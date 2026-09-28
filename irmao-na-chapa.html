@@ -55,6 +55,18 @@
   .toggle button{flex:1;padding:9px;border-radius:10px;border:1px solid #3a2a1c;background:#0e0b0a;
     color:var(--muted);font-weight:600;cursor:pointer;font-family:inherit}
   .toggle button.on{background:var(--orange);color:#1a0d00;border-color:var(--orange)}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:none;align-items:flex-end;justify-content:center;z-index:50}
+  .overlay.open{display:flex}
+  .modal{background:var(--card2);border:1px solid #3a2a1c;border-radius:18px 18px 0 0;width:100%;max-width:640px;
+    max-height:92%;overflow-y:auto;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px))}
+  .modal h2{margin:0 0 4px;font-size:22px;color:var(--yellow);font-weight:400}
+  .modal .resumo{font-size:13px;color:var(--muted);margin-bottom:6px}
+  .modal .resumo b{color:var(--cream)}
+  .modal .row2{display:flex;gap:8px;margin-top:14px}
+  .modal .cancel{flex:0 0 auto;padding:14px 16px;border-radius:12px;border:1px solid #3a2a1c;background:transparent;
+    color:var(--muted);font-weight:600;font-family:inherit;cursor:pointer}
+  .modal .send{margin-top:0;flex:1}
+  .err{color:#ff6b5a;font-size:12.5px;margin-top:8px;display:none}
   .cartbar{position:fixed;left:0;right:0;bottom:0;background:var(--card2);border-top:2px solid var(--orange);
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));max-width:640px;margin:0 auto}
   .cartbar-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
@@ -78,26 +90,6 @@
 <main>
   <div id="menu"></div>
 
-  <fieldset>
-    <legend>Seu pedido</legend>
-    <label>Como prefere receber?</label>
-    <div class="toggle">
-      <button type="button" id="btnRetirada" class="on">Retirar no local</button>
-      <button type="button" id="btnEntrega">Entrega</button>
-    </div>
-    <div id="enderecoWrap" style="display:none">
-      <label>Rua e número *</label>
-      <input type="text" id="rua" placeholder="Ex: Rua das Flores, 123">
-      <label>Bairro *</label>
-      <input type="text" id="bairro" placeholder="Ex: Centro">
-      <label>Complemento / ponto de referência</label>
-      <input type="text" id="compl" placeholder="Ex: apto 12, portão azul, perto da padaria">
-    </div>
-    <label>Seu nome</label>
-    <input type="text" id="nome" placeholder="Como podemos te chamar?">
-    <label>Observações (sabor do suco/açaí, sem cebola, adicional em qual pizza etc.)</label>
-    <textarea id="obs" rows="2" placeholder="Ex: suco de acerola, açaí com granola e leite condensado"></textarea>
-  </fieldset>
 </main>
 
 <div class="cartbar">
@@ -105,6 +97,40 @@
   <div class="cartbar-row"><span>Total</span><span class="price-total" id="cartTotal">R$ 0,00</span></div>
   <button class="send" id="sendBtn" disabled>Enviar pedido pelo WhatsApp</button>
   <div class="empty" id="emptyMsg">Adicione itens ao seu pedido para continuar</div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+    <h2 id="mTitle">Finalizar pedido</h2>
+    <div class="resumo" id="resumo"></div>
+
+    <label>Seu nome *</label>
+    <input type="text" id="nome" placeholder="Como podemos te chamar?" autocomplete="name">
+
+    <label>Como prefere receber? *</label>
+    <div class="toggle">
+      <button type="button" id="btnRetirada" class="on">Retirar no local</button>
+      <button type="button" id="btnEntrega">Entrega</button>
+    </div>
+
+    <div id="enderecoWrap" style="display:none">
+      <label>Rua e número *</label>
+      <input type="text" id="rua" placeholder="Ex: Rua das Flores, 123" autocomplete="street-address">
+      <label>Bairro *</label>
+      <input type="text" id="bairro" placeholder="Ex: Centro">
+      <label>Complemento / ponto de referência</label>
+      <input type="text" id="compl" placeholder="Ex: apto 12, portão azul, perto da padaria">
+    </div>
+
+    <label>Observações (sabor do suco/açaí, sem cebola, adicional em qual pizza etc.)</label>
+    <textarea id="obs" rows="2" placeholder="Ex: suco de acerola, açaí com granola e leite condensado"></textarea>
+
+    <div class="err" id="err"></div>
+    <div class="row2">
+      <button type="button" class="cancel" id="cancelBtn">Voltar</button>
+      <button type="button" class="send" id="confirmBtn">Enviar pelo WhatsApp</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -240,47 +266,70 @@ function updateStatusBanner(){
   document.getElementById("statusTime").textContent = `${min}–${max} min`;
 }
 
-document.getElementById("btnRetirada").addEventListener("click", ()=>{
-  delivery="retirada";
-  document.getElementById("btnRetirada").classList.add("on");
-  document.getElementById("btnEntrega").classList.remove("on");
-  document.getElementById("enderecoWrap").style.display="none";
-});
-document.getElementById("btnEntrega").addEventListener("click", ()=>{
-  delivery="entrega";
-  document.getElementById("btnEntrega").classList.add("on");
-  document.getElementById("btnRetirada").classList.remove("on");
-  document.getElementById("enderecoWrap").style.display="block";
-});
+const $ = id => document.getElementById(id);
 
-document.getElementById("sendBtn").addEventListener("click", ()=>{
+function setDelivery(mode){
+  delivery = mode;
+  $("btnRetirada").classList.toggle("on", mode==="retirada");
+  $("btnEntrega").classList.toggle("on", mode==="entrega");
+  $("enderecoWrap").style.display = mode==="entrega" ? "block" : "none";
+  $("err").style.display = "none";
+}
+$("btnRetirada").addEventListener("click", ()=>setDelivery("retirada"));
+$("btnEntrega").addEventListener("click", ()=>setDelivery("entrega"));
+
+function showErr(msg, field){
+  const e=$("err"); e.textContent=msg; e.style.display="block";
+  if(field) field.focus();
+}
+
+// Botão da barra: abre a janela para pedir nome / retirada ou entrega
+$("sendBtn").addEventListener("click", ()=>{
   const items = allItems().filter(i=>cart[i.id]>0);
   if(items.length===0) return;
   const totalPrice = items.reduce((a,i)=>a+cart[i.id]*i.price,0);
   const wait = estimateWait(allItems());
-  const nome = document.getElementById("nome").value.trim();
-  const rua = document.getElementById("rua").value.trim();
-  const bairro = document.getElementById("bairro").value.trim();
-  const compl = document.getElementById("compl").value.trim();
-  if(delivery==="entrega" && (!rua || !bairro)){
-    alert("Para entrega, informe a rua/número e o bairro.");
-    (!rua ? document.getElementById("rua") : document.getElementById("bairro")).focus();
-    return;
+  $("resumo").innerHTML = `Total: <b>${money(totalPrice)}</b> &nbsp;•&nbsp; Tempo estimado: <b>≈ ${wait} min</b>`;
+  $("err").style.display = "none";
+  $("overlay").classList.add("open");
+});
+
+function closeModal(){ $("overlay").classList.remove("open"); }
+$("cancelBtn").addEventListener("click", closeModal);
+$("overlay").addEventListener("click", e=>{ if(e.target===$("overlay")) closeModal(); });
+
+// Botão da janela: valida e abre o WhatsApp
+$("confirmBtn").addEventListener("click", ()=>{
+  const items = allItems().filter(i=>cart[i.id]>0);
+  if(items.length===0) return;
+  const nome = $("nome").value.trim();
+  const rua = $("rua").value.trim();
+  const bairro = $("bairro").value.trim();
+  const compl = $("compl").value.trim();
+  const obs = $("obs").value.trim();
+
+  if(!nome) return showErr("Informe seu nome para continuar.", $("nome"));
+  if(delivery==="entrega"){
+    if(!rua) return showErr("Informe a rua e o número para a entrega.", $("rua"));
+    if(!bairro) return showErr("Informe o bairro para a entrega.", $("bairro"));
   }
+
+  const totalPrice = items.reduce((a,i)=>a+cart[i.id]*i.price,0);
+  const wait = estimateWait(allItems());
   const endereco = [rua, bairro, compl].filter(Boolean).join(" - ");
-  const obs = document.getElementById("obs").value.trim();
 
   let msg = "Olá! Gostaria de fazer o seguinte pedido no *Irmãos na Chapa*:\n\n";
   items.forEach(i=>{ msg += `• ${cart[i.id]}x ${i.name} - ${money(i.price*cart[i.id])}\n`; });
   msg += `\n*Total: ${money(totalPrice)}*`;
+  msg += `\n*Nome:* ${nome}`;
   msg += `\n*Entrega:* ${delivery==="entrega" ? "Entrega" : "Retirada no local"}`;
-  if(delivery==="entrega" && endereco) msg += `\n*Endereço:* ${endereco}`;
+  if(delivery==="entrega") msg += `\n*Endereço:* ${endereco}`;
   msg += `\n*Tempo estimado:* aproximadamente ${wait} minutos`;
   if(obs) msg += `\n*Observações:* ${obs}`;
-  if(nome) msg += `\n\nNome: ${nome}`;
 
   const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
   window.open(url, "_blank");
+  closeModal();
 });
 
 renderMenu();
