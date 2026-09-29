@@ -67,6 +67,15 @@
     color:var(--muted);font-weight:600;font-family:inherit;cursor:pointer}
   .modal .send{margin-top:0;flex:1}
   .err{color:#ff6b5a;font-size:12.5px;margin-top:8px;display:none}
+  .opt{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid #3a2a1c;border-radius:12px;
+    padding:11px 12px;margin:8px 0 0;cursor:pointer;color:var(--cream);font-size:14px}
+  .opt input{accent-color:var(--orange);width:18px;height:18px;margin:0}
+  .opt .n{flex:1;font-weight:600}
+  .opt .p{color:var(--yellow);font-size:13px}
+  #sBtns{display:flex;gap:8px;margin-top:14px}
+  .li{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:7px 0;border-bottom:1px solid #3a2a1c}
+  .li-r{white-space:nowrap;color:var(--yellow);display:flex;align-items:center;gap:8px}
+  .li-r button{width:24px;height:24px;border-radius:6px;border:none;background:#2c211b;color:var(--cream);cursor:pointer;font-size:14px}
   .cartbar{position:fixed;left:0;right:0;bottom:0;background:var(--card2);border-top:2px solid var(--orange);
     padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));max-width:640px;margin:0 auto}
   .cartbar-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted)}
@@ -103,6 +112,7 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
     <h2 id="mTitle">Finalizar pedido</h2>
     <div class="resumo" id="resumo"></div>
+    <div id="listaPedido"></div>
 
     <label>Seu nome *</label>
     <input type="text" id="nome" placeholder="Como podemos te chamar?" autocomplete="name">
@@ -133,45 +143,76 @@
   </div>
 </div>
 
+<div class="overlay" id="sheetOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sTitle">
+    <h2 id="sTitle"></h2>
+    <div class="resumo" id="sSub"></div>
+    <div id="sOpts"></div>
+    <div id="sBtns"></div>
+  </div>
+</div>
+
 <script>
 // ======= CONFIGURAÇÕES DA LANCHONETE =======
 const WHATSAPP_NUMBER = "5511934853993";
 const BUSY_LEVEL = "normal"; // "normal" | "moderado" | "ocupado" — troque nos horários de pico
 // ============================================
 
+// ADICIONAIS — pizza: preços do cardápio. lanche / dog / porcao: preços de EXEMPLO (confirmar e ajustar)
+const ADDONS = {
+  pizza:[
+    {id:"bacon", name:"Bacon", price:2.50},
+    {id:"azeitona", name:"Azeitona", price:2.50},
+    {id:"milho", name:"Milho", price:2.50},
+    {id:"alho", name:"Alho frito", price:2.50},
+  ],
+  lanche:[
+    {id:"bacon", name:"Bacon", price:4.00},
+    {id:"ovo", name:"Ovo", price:3.00},
+    {id:"queijo", name:"Queijo extra", price:3.00},
+    {id:"cheddar", name:"Cheddar", price:4.00},
+  ],
+  dog:[
+    {id:"salsicha", name:"Salsicha extra", price:3.00},
+    {id:"bacon", name:"Bacon", price:3.00},
+    {id:"queijo", name:"Queijo", price:3.00},
+    {id:"cheddar", name:"Cheddar", price:3.00},
+  ],
+  porcao:[
+    {id:"cheddar", name:"Cheddar", price:5.00},
+    {id:"bacon", name:"Bacon", price:5.00},
+    {id:"parmesao", name:"Molho parmesão", price:5.00},
+  ],
+};
+
+// "addon" na categoria (ou no item) define qual lista de adicionais aparece
 const MENU = [
-  {cat:"Lanches", items:[
-    {id:"dog", name:"Dog Dois Irmãos", price:15.00, prep:6},
+  {cat:"Lanches", addon:"lanche", items:[
+    {id:"dog", name:"Dog Dois Irmãos", price:15.00, prep:6, addon:"dog"},
     {id:"burguer", name:"Irmãos Burguer", price:19.99, prep:9},
     {id:"verde", name:"Irmãos Verde", price:22.50, prep:9},
     {id:"calabrocolis", name:"Irmão Calabrócolis", price:27.99, prep:10},
     {id:"irmaozinho", name:"Irmãozinho (combo c/ batata e refri 200ml)", price:19.90, prep:10},
   ]},
-  {cat:"Porções", items:[
+  {cat:"Porções", addon:"porcao", items:[
     {id:"batata", name:"Batata frita", price:24.99, prep:10},
     {id:"batatacheddar", name:"Batata c/ cheddar e bacon ou molho parmesão", price:29.99, prep:12},
     {id:"calabresaaceb", name:"Calabresa acebolada", price:29.99, prep:10},
     {id:"combogrande", name:"Batata, anéis de cebola e calabresa acebolada", price:34.99, prep:14},
   ]},
-  {cat:"Mini Pizza (fatia)", hint:"informe o sabor nas observações", items:[
+  {cat:"Mini Pizza", addon:"pizza", items:[
     {id:"mpcalabresa", name:"Calabresa", price:7.50, prep:4},
     {id:"mppresunto", name:"Presunto e Queijo", price:7.50, prep:4},
     {id:"mpfrango", name:"Frango", price:7.50, prep:4},
     {id:"mpqueijo", name:"Queijo", price:7.50, prep:4},
     {id:"mpbrocolis", name:"Brócolis", price:7.50, prep:4},
   ]},
-  {cat:"Brotinho (pizza pequena)", hint:"informe o sabor nas observações", items:[
+  {cat:"Brotinho (pizza pequena)", addon:"pizza", items:[
     {id:"brcalabresa", name:"Calabresa", price:29.99, prep:12},
     {id:"brpresunto", name:"Presunto e Queijo", price:29.99, prep:12},
     {id:"brfrango", name:"Frango", price:29.99, prep:12},
     {id:"brqueijo", name:"Queijo", price:29.99, prep:12},
     {id:"brbrocolis", name:"Brócolis", price:29.99, prep:12},
-  ]},
-  {cat:"Adicionais para pizza", hint:"informe em qual pizza vai o adicional", items:[
-    {id:"adbacon", name:"Bacon", price:2.50, prep:0},
-    {id:"adazeitona", name:"Azeitona", price:2.50, prep:0},
-    {id:"admilho", name:"Milho", price:2.50, prep:0},
-    {id:"adalho", name:"Alho frito", price:2.50, prep:0},
   ]},
   {cat:"Doces", items:[
     {id:"brigadeiro", name:"Brigadeiro", price:9.00, prep:2},
@@ -193,25 +234,116 @@ const MENU = [
   ]},
 ];
 
+const $ = id => document.getElementById(id);
 const BUSY_MULT = {normal:1, moderado:1.3, ocupado:1.6};
-const cart = {};
+const ITEMS = {};
+MENU.forEach(c=>c.items.forEach(i=>{ ITEMS[i.id] = {...i, addon: i.addon || c.addon || null}; }));
+
 let delivery = "retirada";
+let lines = []; // {itemId, addons:[ids], qty}
 
 function money(v){ return "R$ " + v.toFixed(2).replace(".", ","); }
-function allItems(){ return MENU.flatMap(c=>c.items); }
+function addonOf(it, id){ return ADDONS[it.addon].find(a=>a.id===id); }
 
-function estimateWait(items){
+// ---------- carrinho ----------
+const keyOf = (itemId, ids) => itemId + "|" + [...ids].sort().join(",");
+function findLine(itemId, ids){ const k = keyOf(itemId, ids); return lines.find(l => keyOf(l.itemId, l.addons) === k); }
+function addToLine(itemId, ids, n){
+  const l = findLine(itemId, ids);
+  if(l) l.qty += n; else lines.push({itemId, addons:[...ids], qty:n});
+}
+function removeFromLine(line, n){ line.qty -= n; if(line.qty <= 0) lines = lines.filter(x => x !== line); }
+function unitsOf(itemId){ return lines.filter(l=>l.itemId===itemId).reduce((a,l)=>a+l.qty,0); }
+function plainCount(itemId){ const l = findLine(itemId, []); return l ? l.qty : 0; }
+function unitPrice(l){
+  const it = ITEMS[l.itemId];
+  return it.price + l.addons.reduce((a,id)=>a + addonOf(it,id).price, 0);
+}
+function lineLabel(l){
+  const it = ITEMS[l.itemId];
+  const ad = l.addons.length ? " (com " + l.addons.map(id=>addonOf(it,id).name).join(", ") + ")" : "";
+  return `${l.qty}x ${it.name}${ad}`;
+}
+const totalPrice = () => lines.reduce((a,l)=>a + unitPrice(l)*l.qty, 0);
+const totalQty = () => lines.reduce((a,l)=>a + l.qty, 0);
+
+function estimateWait(){
   const base = 10;
-  const sum = items.reduce((a,i)=> a + i.prep * (cart[i.id]||0), 0);
-  const parallel = 0.6;
-  let total = (base + sum*parallel) * BUSY_MULT[BUSY_LEVEL];
+  const sum = lines.reduce((a,l)=> a + ITEMS[l.itemId].prep * l.qty, 0);
+  let total = (base + sum*0.6) * BUSY_MULT[BUSY_LEVEL];
   total = Math.min(Math.max(total, 15), 60);
   return Math.round(total/5)*5;
 }
 
+function addUnit(itemId){
+  addToLine(itemId, [], 1);
+  refresh();
+  if(ITEMS[itemId].addon) askAddons(itemId, true);
+}
+function removeUnit(itemId){
+  let l = findLine(itemId, []);
+  if(!l){ const ls = lines.filter(x=>x.itemId===itemId); l = ls[ls.length-1]; }
+  if(l) removeFromLine(l, 1);
+  refresh();
+}
+
+// ---------- janelinha de adicionais ----------
+function showSheet({title, sub, options, buttons}){
+  $("sTitle").textContent = title;
+  $("sSub").textContent = sub || "";
+  const o = $("sOpts"); o.innerHTML = "";
+  (options || []).forEach(a=>{
+    const lab = document.createElement("label"); lab.className = "opt";
+    lab.innerHTML = `<input type="checkbox" value="${a.id}"><span class="n">${a.name}</span><span class="p">+ ${money(a.price)}</span>`;
+    o.appendChild(lab);
+  });
+  const b = $("sBtns"); b.innerHTML = "";
+  buttons.forEach(bt=>{
+    const el = document.createElement("button");
+    el.type = "button"; el.className = bt.primary ? "send" : "cancel"; el.textContent = bt.label;
+    el.addEventListener("click", ()=>{
+      const ids = [...o.querySelectorAll("input:checked")].map(x=>x.value);
+      closeSheet(); if(bt.onClick) bt.onClick(ids);
+    });
+    b.appendChild(el);
+  });
+  $("sheetOverlay").classList.add("open");
+}
+function closeSheet(){ $("sheetOverlay").classList.remove("open"); }
+$("sheetOverlay").addEventListener("click", e=>{ if(e.target === $("sheetOverlay")) closeSheet(); });
+
+function askAddons(itemId, first){
+  const it = ITEMS[itemId], plain = plainCount(itemId);
+  if(plain <= 0) return;
+  const title = first ? `Quer adicionar algo ao ${it.name}?`
+    : (plain > 1 ? `E os outros ${plain} ${it.name}: quer algum adicional diferente?`
+                 : `E o outro ${it.name}: quer algum adicional diferente?`);
+  const sub = plain > 1 ? `Você tem ${plain} sem adicional. Marque o que quiser.` : "Marque os adicionais que quiser.";
+  showSheet({title, sub, options: ADDONS[it.addon], buttons:[
+    {label: first ? "Não, obrigado" : "Não, sem adicional"},
+    {label:"Adicionar", primary:true, onClick: ids => { if(ids.length) chooseScope(itemId, ids); }},
+  ]});
+}
+function chooseScope(itemId, ids){
+  const it = ITEMS[itemId], plain = plainCount(itemId);
+  if(plain <= 1){ applyAddons(itemId, ids, 1); return; }
+  const names = ids.map(id=>addonOf(it,id).name).join(", ");
+  showSheet({title:"Esse adicional é em qual?", sub:`${names} — você tem ${plain} ${it.name} sem adicional.`, buttons:[
+    {label:"Só em 1 deles", onClick: ()=>{ applyAddons(itemId, ids, 1); askAddons(itemId, false); }},
+    {label:`Nos ${plain}`, primary:true, onClick: ()=> applyAddons(itemId, ids, plain)},
+  ]});
+}
+function applyAddons(itemId, ids, n){
+  const p = findLine(itemId, []);
+  if(!p) return;
+  removeFromLine(p, n);
+  addToLine(itemId, ids, n);
+  refresh();
+}
+
+// ---------- tela ----------
 function renderMenu(){
-  const el = document.getElementById("menu");
-  el.innerHTML = MENU.map(cat => `
+  $("menu").innerHTML = MENU.map(cat => `
     <div class="cat">${cat.cat}</div>
     ${cat.hint ? `<div class="cat-hint">${cat.hint}</div>` : ""}
     ${cat.items.map(it => `
@@ -228,45 +360,44 @@ function renderMenu(){
       </div>
     `).join("")}
   `).join("");
-  el.querySelectorAll("button[data-id]").forEach(b=>{
+  $("menu").querySelectorAll("button[data-id]").forEach(b=>{
     b.addEventListener("click", ()=>{
-      const id=b.dataset.id, d=parseInt(b.dataset.d);
-      cart[id] = Math.max(0, (cart[id]||0)+d);
-      document.getElementById("q-"+id).textContent = cart[id];
-      update();
+      if(b.dataset.d === "1") addUnit(b.dataset.id); else removeUnit(b.dataset.id);
     });
   });
 }
 
+function refresh(){
+  Object.keys(ITEMS).forEach(id=>{ $("q-"+id).textContent = unitsOf(id); });
+  update();
+  if($("overlay").classList.contains("open")) renderResumo();
+}
+
 function update(){
-  const items = allItems();
-  const chosen = items.filter(i=>cart[i.id]>0);
-  const totalQty = chosen.reduce((a,i)=>a+cart[i.id],0);
-  const totalPrice = chosen.reduce((a,i)=>a+cart[i.id]*i.price,0);
-  document.getElementById("cartCount").textContent = totalQty + (totalQty===1?" item":" itens");
-  document.getElementById("cartTotal").textContent = money(totalPrice);
-  const sendBtn = document.getElementById("sendBtn");
-  const emptyMsg = document.getElementById("emptyMsg");
-  if(totalQty>0){
-    const w = estimateWait(items);
-    document.getElementById("cartTime").textContent = "≈ " + w + " min";
-    sendBtn.disabled = false;
-    emptyMsg.style.display = "none";
-  } else {
-    document.getElementById("cartTime").textContent = "";
-    sendBtn.disabled = true;
-    emptyMsg.style.display = "block";
-  }
+  const q = totalQty();
+  $("cartCount").textContent = q + (q===1 ? " item" : " itens");
+  $("cartTotal").textContent = money(totalPrice());
+  $("sendBtn").disabled = q === 0;
+  $("emptyMsg").style.display = q > 0 ? "none" : "block";
+  $("cartTime").textContent = q > 0 ? "≈ " + estimateWait() + " min" : "";
 }
 
 function updateStatusBanner(){
-  const base = 10 * BUSY_MULT[BUSY_LEVEL];
-  const min = Math.round(base/5)*5;
-  const max = 60;
-  document.getElementById("statusTime").textContent = `${min}–${max} min`;
+  const min = Math.round(10 * BUSY_MULT[BUSY_LEVEL] / 5) * 5;
+  $("statusTime").textContent = `${min}–60 min`;
 }
 
-const $ = id => document.getElementById(id);
+// ---------- finalizar pedido ----------
+function renderResumo(){
+  if(lines.length === 0){ closeModal(); return; }
+  $("resumo").innerHTML = `Total: <b>${money(totalPrice())}</b> &nbsp;•&nbsp; Tempo estimado: <b>≈ ${estimateWait()} min</b>`;
+  $("listaPedido").innerHTML = lines.map((l,i)=>`
+    <div class="li"><span>${lineLabel(l)}</span>
+    <span class="li-r">${money(unitPrice(l)*l.qty)} <button type="button" data-i="${i}" aria-label="Remover um">×</button></span></div>`).join("");
+  $("listaPedido").querySelectorAll("button[data-i]").forEach(b=>{
+    b.addEventListener("click", ()=>{ removeFromLine(lines[+b.dataset.i], 1); refresh(); });
+  });
+}
 
 function setDelivery(mode){
   delivery = mode;
@@ -279,29 +410,22 @@ $("btnRetirada").addEventListener("click", ()=>setDelivery("retirada"));
 $("btnEntrega").addEventListener("click", ()=>setDelivery("entrega"));
 
 function showErr(msg, field){
-  const e=$("err"); e.textContent=msg; e.style.display="block";
+  const e = $("err"); e.textContent = msg; e.style.display = "block";
   if(field) field.focus();
 }
 
-// Botão da barra: abre a janela para pedir nome / retirada ou entrega
 $("sendBtn").addEventListener("click", ()=>{
-  const items = allItems().filter(i=>cart[i.id]>0);
-  if(items.length===0) return;
-  const totalPrice = items.reduce((a,i)=>a+cart[i.id]*i.price,0);
-  const wait = estimateWait(allItems());
-  $("resumo").innerHTML = `Total: <b>${money(totalPrice)}</b> &nbsp;•&nbsp; Tempo estimado: <b>≈ ${wait} min</b>`;
+  if(lines.length === 0) return;
   $("err").style.display = "none";
+  renderResumo();
   $("overlay").classList.add("open");
 });
-
 function closeModal(){ $("overlay").classList.remove("open"); }
 $("cancelBtn").addEventListener("click", closeModal);
-$("overlay").addEventListener("click", e=>{ if(e.target===$("overlay")) closeModal(); });
+$("overlay").addEventListener("click", e=>{ if(e.target === $("overlay")) closeModal(); });
 
-// Botão da janela: valida e abre o WhatsApp
 $("confirmBtn").addEventListener("click", ()=>{
-  const items = allItems().filter(i=>cart[i.id]>0);
-  if(items.length===0) return;
+  if(lines.length === 0) return;
   const nome = $("nome").value.trim();
   const rua = $("rua").value.trim();
   const bairro = $("bairro").value.trim();
@@ -309,26 +433,22 @@ $("confirmBtn").addEventListener("click", ()=>{
   const obs = $("obs").value.trim();
 
   if(!nome) return showErr("Informe seu nome para continuar.", $("nome"));
-  if(delivery==="entrega"){
+  if(delivery === "entrega"){
     if(!rua) return showErr("Informe a rua e o número para a entrega.", $("rua"));
     if(!bairro) return showErr("Informe o bairro para a entrega.", $("bairro"));
   }
-
-  const totalPrice = items.reduce((a,i)=>a+cart[i.id]*i.price,0);
-  const wait = estimateWait(allItems());
   const endereco = [rua, bairro, compl].filter(Boolean).join(" - ");
 
   let msg = "Olá! Gostaria de fazer o seguinte pedido no *Irmãos na Chapa*:\n\n";
-  items.forEach(i=>{ msg += `• ${cart[i.id]}x ${i.name} - ${money(i.price*cart[i.id])}\n`; });
-  msg += `\n*Total: ${money(totalPrice)}*`;
+  lines.forEach(l=>{ msg += `• ${lineLabel(l)} - ${money(unitPrice(l)*l.qty)}\n`; });
+  msg += `\n*Total: ${money(totalPrice())}*`;
   msg += `\n*Nome:* ${nome}`;
   msg += `\n*Entrega:* ${delivery==="entrega" ? "Entrega" : "Retirada no local"}`;
-  if(delivery==="entrega") msg += `\n*Endereço:* ${endereco}`;
-  msg += `\n*Tempo estimado:* aproximadamente ${wait} minutos`;
+  if(delivery === "entrega") msg += `\n*Endereço:* ${endereco}`;
+  msg += `\n*Tempo estimado:* aproximadamente ${estimateWait()} minutos`;
   if(obs) msg += `\n*Observações:* ${obs}`;
 
-  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
-  window.open(url, "_blank");
+  window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, "_blank");
   closeModal();
 });
 
